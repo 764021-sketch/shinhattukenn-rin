@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深発見アプリ（臨書編）</title>
+    <!-- 画面を画像化するためのライブラリ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --bg-main: #e3f2fd; 
+            --bg-card: #ffffff;
+            --bg-intuition: #fce4ec; 
+            --bg-brush: #e8f5e9;     
+            --bg-shape: #fffde7;     
+            --accent-blue: #1a73e8;
+            --accent-red: #d93025;
+            --text-dark: #202124;
+            --border-color: #dadce0;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background-color: #f0f2f5;
+            color: var(--text-dark);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+
+        .container {
+            max-width: 1400px; 
+            margin: 0 auto;
+        }
+
+        /* 教師用ツールエリア */
+        .utility-area {
+            background: #fff9c4;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 2px solid #fbc02d;
+        }
+
+        /* レポートエリア */
+        #report-area {
+            background-color: var(--bg-main);
+            padding: 40px 50px;
+            border-radius: 10px;
+            border: 1px solid #bbdefb;
+            min-width: 1200px;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        header h1 {
+            margin: 0 0 15px 0;
+            color: #1565c0;
+            font-size: 3rem; 
+        }
+
+        /* 入力項目 */
+        .info-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+        }
+
+        /* キャプチャ時に置き換える用 */
+        .capture-text-replacement {
+            display: none;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 24px;
+            font-weight: bold;
+            min-height: 1.2em;
+            text-align: left;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .info-inputs input {
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 24px; 
+            font-weight: bold;
+            background: white;
+            box-sizing: border-box;
+        }
+
+        .input-date { width: 250px; }
+        .input-unit { width: 350px; }
+        .input-name { width: 250px; }
+
+        .main-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .top-row {
+            display: grid;
+            grid-template-columns: 1.5fr 1.5fr 1.2fr; 
+            gap: 20px;
+        }
+
+        .image-card {
+            background: var(--bg-card);
+            border-radius: 15px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border: 4px solid transparent;
+        }
+
+        .image-card.active { border-color: var(--accent-blue); }
+
+        .image-preview {
+            width: 100%;
+            height: 400px; 
+            background: #f1f3f4;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .analysis-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .section-box {
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .section-title {
+            font-weight: bold;
+            font-size: 24px; 
+            margin-bottom: 8px;
+            color: #1a237e;
+            display: block;
+        }
+
+        .word-card {
+            display: inline-block;
+            padding: 6px 14px;
+            margin: 3px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            font-size: 19px; 
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .word-card.selected {
+            background: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
+        }
+
+        .bottom-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 20px;
+            border: 2px solid #ccc;
+            border-radius: 12px;
+            resize: none;
+            font-size: 26px; 
+            font-weight: bold;
+            height: 250px;
+            box-sizing: border-box;
+            line-height: 1.4;
+            font-family: inherit;
+        }
+
+        textarea::placeholder {
+            font-size: 20px;
+            font-weight: normal;
+            color: #999;
+        }
+
+        /* キャプチャ用の大きなテキスト表示エリア */
+        .textarea-replacement {
+            display: none;
+            width: 100%;
+            min-height: 250px;
+            padding: 20px;
+            border: 2px solid #ccc;
+            border-radius: 12px;
+            background: white;
+            font-size: 26px;
+            font-weight: bold;
+            line-height: 1.4;
+            box-sizing: border-box;
+            white-space: pre-wrap;
+        }
+
+        .no-capture-ui { margin-top: 10px; }
+
+        .controls {
+            margin-top: 30px;
+            text-align: center;
+            padding-bottom: 50px;
+        }
+
+        .btn {
+            padding: 20px 50px;
+            border-radius: 50px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            background: #ff9800;
+            color: white;
+        }
+
+        .btn-primary { background: #ff9800; }
+        .btn:disabled { background: #ccc; }
+
+        .alert-message {
+            color: var(--accent-red);
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .btn-delete {
+            position: absolute;
+            top: 5px; right: 5px;
+            background: var(--accent-red);
+            color: white; border: none;
+            width: 35px; height: 35px; border-radius: 50%;
+            cursor: pointer; display: none;
+            font-size: 20px;
+        }
+        .has-image .btn-delete { display: block; }
+        .hidden { display: none !important; }
+
+        /* 画像書き出し時のみ適用されるスタイル（クローン用） */
+        .capturing input, .capturing textarea { display: none !important; }
+        .capturing .capture-text-replacement, .capturing .textarea-replacement { display: block !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="utility-area" id="teacher-tools">
+        <strong>🎓 教師用：お手本配布準備</strong>
+        <button onclick="toggleTeacherMode()" style="margin-left:20px;">設定完了（隠す）</button>
+    </div>
+
+    <div id="report-area">
+        <header>
+            <h1>深発見アプリ（臨書編）</h1>
+            <div class="info-inputs">
+                <div class="input-container">
+                    <input type="date" id="doc-date" class="input-date">
+                    <div id="replace-date" class="capture-text-replacement input-date"></div>
+                </div>
+                <div class="input-container">
+                    <input type="text" id="doc-unit" class="input-unit" placeholder="単元名（例：蘭亭序）">
+                    <div id="replace-unit" class="capture-text-replacement input-unit"></div>
+                </div>
+                <div class="input-container">
+                    <input type="text" id="doc-name" class="input-name" placeholder="氏名">
+                    <div id="replace-name" class="capture-text-replacement input-name"></div>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-layout">
+            <div class="top-row">
+                <!-- 古典 -->
+                <div class="image-card" id="card-koten" onclick="setActiveCard('koten')">
+                    <button class="btn-delete" onclick="removeImage(event, 'koten')">×</button>
+                    <span class="section-title">古典（お手本）</span>
+                    <div class="image-preview" id="preview-koten"><span>画像を選択</span></div>
+                    <div class="no-capture-ui" style="text-align:center;">
+                        <input type="file" id="input-koten" accept="image/*" style="display:none">
+                        <button class="word-card" style="color:var(--accent-blue); border-color:var(--accent-blue);" onclick="event.stopPropagation(); document.getElementById('input-koten').click()">画像を選ぶ</button>
+                    </div>
+                </div>
+
+                <!-- 自分 -->
+                <div class="image-card" id="card-self" onclick="setActiveCard('self')">
+                    <button class="btn-delete" onclick="removeImage(event, 'self')">×</button>
+                    <span class="section-title">自分の作品</span>
+                    <div class="image-preview" id="preview-self"><span>枠を選択して貼り付け</span></div>
+                    <div class="no-capture-ui" style="text-align:center;">
+                        <input type="file" id="input-self" accept="image/*" style="display:none">
+                        <button class="word-card" onclick="event.stopPropagation(); document.getElementById('input-self').click()">画像を選ぶ</button>
+                    </div>
+                </div>
+
+                <!-- 分析（右側にスタック） -->
+                <div class="analysis-stack">
+                    <div class="section-box" style="background-color: var(--bg-intuition);">
+                        <span class="section-title">直感的鑑賞（第一印象）</span>
+                        <div class="word-card" data-category="intuition">温かい</div><div class="word-card" data-category="intuition">冷たい</div>
+                        <div class="word-card" data-category="intuition">優しい</div><div class="word-card" data-category="intuition">厳しい</div>
+                        <div class="word-card" data-category="intuition">重厚</div><div class="word-card" data-category="intuition">軽快</div>
+                        <div class="word-card" data-category="intuition">力強い</div><div class="word-card" data-category="intuition">柔和な</div>
+                    </div>
+                    <div class="section-box" style="background-color: var(--bg-brush);">
+                        <span class="section-title">分析的鑑賞（筆遣い）</span>
+                        <div class="word-card" data-category="brush">太い</div><div class="word-card" data-category="brush">細い</div>
+                        <div class="word-card" data-category="brush">直線的</div><div class="word-card" data-category="brush">曲線的</div>
+                        <div class="word-card" data-category="brush">角ばった</div><div class="word-card" data-category="brush">丸みのある</div>
+                        <div class="word-card" data-category="brush">露鋒</div><div class="word-card" data-category="brush">蔵鋒</div>
+                    </div>
+                    <div class="section-box" style="background-color: var(--bg-shape);">
+                        <span class="section-title">分析的鑑賞（字形）</span>
+                        <div class="word-card" data-category="shape">縦長</div><div class="word-card" data-category="shape">横長</div>
+                        <div class="word-card" data-category="shape">背勢</div><div class="word-card" data-category="shape">向勢</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bottom-row">
+                <div class="section-box" style="background: white;">
+                    <span class="section-title">発見したこと（詳しい分析）</span>
+                    <textarea id="text-analysis" placeholder="なぜその言葉カードを選んだのか、古典のどこ（点画の終筆、折れ、空間など）を見てそう思ったのかを詳しく書きましょう。"></textarea>
+                    <div id="replace-analysis" class="textarea-replacement"></div>
+                </div>
+                <div class="section-box" style="background: white; border: 3px solid var(--accent-blue);">
+                    <span class="section-title">振り返り（次へのステップ）</span>
+                    <textarea id="text-self-eval" placeholder="古典の特徴を、自分の作品でどのように表現しようとしたかな？また、次はどんなことに気をつけて書きたいですか。"></textarea>
+                    <div id="replace-self-eval" class="textarea-replacement"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div id="alert-msg" class="alert-message">全て入力・選択しないと提出（保存）できません。</div>
+        <button id="btn-download" class="btn btn-primary" disabled>📸 画像として保存して提出</button>
+    </div>
+</div>
+
+<script>
+    let activeCard = 'self';
+    const state = { intuition: [], brush: [], shape: [] };
+
+    window.onload = () => {
+        document.getElementById('doc-date').value = new Date().toISOString().split('T')[0];
+    };
+
+    function updateImageDisplay(type, src) {
+        document.getElementById(`preview-${type}`).innerHTML = `<img src="${src}">`;
+        document.getElementById(`card-${type}`).classList.add('has-image');
+        checkValidation();
+    }
+
+    document.getElementById('input-koten').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (f) => updateImageDisplay('koten', f.target.result);
+            reader.readAsDataURL(file);
+        }
+    });
+
+    document.getElementById('input-self').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (f) => updateImageDisplay('self', f.target.result);
+            reader.readAsDataURL(file);
+        }
+    });
+
+    function toggleTeacherMode() {
+        if(confirm("教師用メニューを隠しますか？")) {
+            document.getElementById('teacher-tools').classList.add('hidden');
+        }
+    }
+
+    function setActiveCard(type) {
+        activeCard = type;
+        document.getElementById('card-koten').classList.toggle('active', type==='koten');
+        document.getElementById('card-self').classList.toggle('active', type==='self');
+    }
+
+    function removeImage(event, type) {
+        event.stopPropagation();
+        document.getElementById(`preview-${type}`).innerHTML = `<span>画像を選択</span>`;
+        document.getElementById(`card-${type}`).classList.remove('has-image');
+        checkValidation();
+    }
+
+    document.querySelectorAll('.word-card[data-category]').forEach(card => {
+        card.addEventListener('click', () => {
+            card.classList.toggle('selected');
+            const cat = card.dataset.category;
+            const word = card.innerText;
+            if (card.classList.contains('selected')) state[cat].push(word);
+            else state[cat] = state[cat].filter(w => w !== word);
+            checkValidation();
+        });
+    });
+
+    const fields = ['doc-unit', 'doc-name', 'text-analysis', 'text-self-eval'];
+    fields.forEach(id => document.getElementById(id).addEventListener('input', checkValidation));
+
+    function checkValidation() {
+        const filled = fields.every(id => document.getElementById(id).value.trim() !== "");
+        const images = document.querySelector('#preview-koten img') && document.querySelector('#preview-self img');
+        const cards = state.intuition.length || state.brush.length || state.shape.length;
+        
+        const isValid = filled && images && cards;
+        document.getElementById('btn-download').disabled = !isValid;
+        document.getElementById('alert-msg').style.display = isValid ? 'none' : 'block';
+    }
+
+    document.getElementById('btn-download').addEventListener('click', async () => {
+        const area = document.getElementById('report-area');
+        
+        // 保存直前に、入力値をテキスト表示用DIVにコピー
+        document.getElementById('replace-date').innerText = document.getElementById('doc-date').value;
+        document.getElementById('replace-unit').innerText = document.getElementById('doc-unit').value;
+        document.getElementById('replace-name').innerText = document.getElementById('doc-name').value;
+        document.getElementById('replace-analysis').innerText = document.getElementById('text-analysis').value;
+        document.getElementById('replace-self-eval').innerText = document.getElementById('text-self-eval').value;
+
+        // UIの非表示
+        const noCaptures = document.querySelectorAll('.no-capture-ui, .btn-delete');
+        noCaptures.forEach(el => el.style.visibility = 'hidden');
+
+        try {
+            const originalScrollY = window.scrollY;
+            window.scrollTo(0, 0);
+
+            const canvas = await html2canvas(area, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#e3f2fd',
+                scrollX: 0,
+                scrollY: 0,
+                x: 0,
+                y: 0,
+                width: area.offsetWidth,
+                height: area.offsetHeight,
+                onclone: (clonedDoc) => {
+                    const clonedArea = clonedDoc.getElementById('report-area');
+                    clonedArea.classList.add('capturing');
+                    clonedArea.style.paddingTop = '60px'; // 上のタイトル切れ対策
+                }
+            }); 
+            
+            window.scrollTo(0, originalScrollY);
+
+            const link = document.createElement('a');
+            const name = document.getElementById('doc-name').value || 'student';
+            link.download = `臨書深発見_${name}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+        } catch (error) {
+            alert("画像の作成に失敗しました。");
+            console.error(error);
+        } finally {
+            noCaptures.forEach(el => el.style.visibility = 'visible');
+        }
+    });
+
+    document.addEventListener('paste', e => {
+        const item = Array.from(e.clipboardData.items).find(i => i.type.includes('image'));
+        if (item) {
+            const reader = new FileReader();
+            reader.onload = f => updateImageDisplay(activeCard, f.target.result);
+            reader.readAsDataURL(item.getAsFile());
+        }
+    });
+</script>
+</body>
+</html>
